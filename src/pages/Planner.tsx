@@ -1,99 +1,96 @@
 import { useState } from 'react';
-import DateStrip from '@/components/planner/DateStrip';
-import { Plus, Check, Trash2 } from 'lucide-react';
+import { format, addHours, startOfDay } from 'date-fns';
+import { Plus, CheckSquare, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
-
-interface Task {
-    id: string;
-    text: string;
-    completed: boolean;
-}
+import DateStrip from '@/components/planner/DateStrip';
+import { usePlanner } from '@/hooks/usePlanner';
 
 export default function Planner() {
     const [selectedDate, setSelectedDate] = useState(new Date());
+    const {
+        tasks,
+        entries,
+        loading,
+        addTask,
+        toggleTask,
+        deleteTask,
+        updateEntry
+    } = usePlanner(selectedDate);
 
-    // Prioridades
-    const [priorities, setPriorities] = useState(['', '', '']);
+    const [newTask, setNewTask] = useState('');
 
-    // Time Blocking (5 AM - 10 PM)
-    const hours = Array.from({ length: 18 }, (_, i) => i + 5); // 5 to 22 (10pm)
-    const [schedule, setSchedule] = useState<Record<number, string>>({});
+    // Generate time slots 05:00 to 22:00
+    const startHour = 5;
+    const endHour = 22;
+    const schedule = Array.from({ length: endHour - startHour + 1 }, (_, i) => {
+        const date = addHours(startOfDay(new Date()), startHour + i);
+        return {
+            timeLabel: format(date, 'h a'),
+            hourKey: `schedule_${String(startHour + i).padStart(2, '0')}` // e.g., schedule_05
+        };
+    });
 
-    // Tasks
-    const [tasks, setTasks] = useState<Task[]>([
-        { id: '1', text: 'Revisar correos', completed: false },
-        { id: '2', text: 'Hacer ejercicio', completed: true },
-    ]);
-    const [newTaskText, setNewTaskText] = useState('');
-    const [isAddingTask, setIsAddingTask] = useState(false);
-
-    const handlePriorityChange = (index: number, value: string) => {
-        const newPriorities = [...priorities];
-        newPriorities[index] = value;
-        setPriorities(newPriorities);
-    };
-
-    const handleScheduleChange = (hour: number, value: string) => {
-        setSchedule(prev => ({ ...prev, [hour]: value }));
-    };
-
-    const toggleTask = (id: string) => {
-        setTasks(tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
-    };
-
-    const addTask = () => {
-        if (newTaskText.trim()) {
-            setTasks([...tasks, { id: crypto.randomUUID(), text: newTaskText, completed: false }]);
-            setNewTaskText('');
-            setIsAddingTask(false);
-        }
+    const handleAddTask = (e: React.FormEvent) => {
+        e.preventDefault();
+        addTask(newTask);
+        setNewTask('');
     };
 
     return (
-        <div className="px-4 pb-4 max-w-md mx-auto space-y-8 animate-fade-in">
+        <div className="px-4 pb-24 max-w-md mx-auto space-y-8 animate-fade-in">
 
-            {/* Date Selector */}
-            <DateStrip selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+            {/* Header / Date Strip */}
+            <div className="pt-6">
+                <h1 className="text-3xl font-serif text-text-main mb-4 flex items-center gap-2">
+                    Agenda
+                    {loading && <span className="text-xs font-sans text-primary animate-pulse">(Sync...)</span>}
+                </h1>
+                <DateStrip selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+            </div>
 
-            {/* Priorities */}
-            <section className="bg-accent/10 p-5 rounded-2xl border-l-4 border-accent">
-                <h3 className="font-serif text-lg font-medium text-text-main mb-3">
-                    Prioridades del Día
-                </h3>
-                <div className="space-y-3">
-                    {priorities.map((priority, index) => (
-                        <div key={index} className="flex items-center gap-3">
-                            <span className="text-accent font-bold text-lg">{index + 1}.</span>
+            {/* Top 3 Priorities */}
+            <section className="space-y-3">
+                <h3 className="font-serif text-lg font-medium text-text-main">Prioridades del Día</h3>
+                <div className="space-y-2">
+                    {[1, 2, 3].map((num) => (
+                        <div key={num} className="flex gap-2">
+                            <div className="font-serif text-accent font-bold text-xl opacity-50 w-6 text-right">
+                                {num}.
+                            </div>
                             <input
                                 type="text"
-                                value={priority}
-                                onChange={(e) => handlePriorityChange(index, e.target.value)}
-                                placeholder="Escribe una prioridad..."
-                                className="w-full bg-transparent border-b border-accent/20 pb-1 text-text-main placeholder-text-muted/60 focus:outline-none focus:border-accent transition-colors"
+                                value={entries[`priority_${num}`] || ''}
+                                onChange={(e) => updateEntry(`priority_${num}`, e.target.value)}
+                                placeholder="Escribe tu prioridad..."
+                                className="flex-1 bg-accent/5 border-b-2 border-accent/20 focus:border-accent px-2 py-1 outline-none transition-colors text-text-main"
                             />
                         </div>
                     ))}
                 </div>
             </section>
 
-            {/* Time Blocking */}
-            <section className="bg-surface p-5 rounded-2xl shadow-sm">
-                <h3 className="font-serif text-lg font-medium text-text-main mb-4">
-                    Agenda
-                </h3>
-                <div className="space-y-4">
-                    {hours.map((hour) => (
-                        <div key={hour} className="flex gap-4 items-baseline group">
-                            <span className="w-12 text-sm text-text-muted font-medium text-right shrink-0">
-                                {hour}:00
+            {/* Time Blocking (05:00 - 22:00) */}
+            <section>
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-serif text-lg font-medium text-text-main">
+                        Horario
+                    </h3>
+                    <span className="text-xs text-text-muted">05:00 - 22:00</span>
+                </div>
+
+                <div className="bg-surface rounded-2xl shadow-sm p-4 space-y-4">
+                    {schedule.map(({ timeLabel, hourKey }) => (
+                        <div key={hourKey} className="flex items-start gap-4 group">
+                            <span className="text-xs font-bold text-text-muted w-10 pt-2 text-right">
+                                {timeLabel}
                             </span>
-                            <div className="flex-1 relative">
+                            <div className="flex-1 border-l-2 border-gray-100 pl-3 py-1 group-focus-within:border-primary/50 transition-colors">
                                 <input
                                     type="text"
-                                    value={schedule[hour] || ''}
-                                    onChange={(e) => handleScheduleChange(hour, e.target.value)}
-                                    placeholder="Escribe aquí..."
-                                    className="w-full bg-transparent border-b border-gray-100 py-1 text-sm text-text-main placeholder-gray-200 focus:outline-none focus:border-primary/50 transition-colors"
+                                    value={entries[hourKey] || ''}
+                                    onChange={(e) => updateEntry(hourKey, e.target.value)}
+                                    placeholder=""
+                                    className="w-full bg-transparent border-none p-0 focus:ring-0 text-sm placeholder-gray-300"
                                 />
                             </div>
                         </div>
@@ -102,66 +99,60 @@ export default function Planner() {
             </section>
 
             {/* To-Do List */}
-            <section className="bg-surface p-5 rounded-2xl shadow-sm">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-serif text-lg font-medium text-text-main">
-                        Tareas
-                    </h3>
-                    <button
-                        onClick={() => setIsAddingTask(true)}
-                        className="text-primary hover:bg-primary/10 p-1.5 rounded-full transition-colors"
-                    >
+            <section>
+                <h3 className="font-serif text-lg font-medium text-text-main mb-4">
+                    Tareas Pendientes
+                </h3>
+
+                <form onSubmit={handleAddTask} className="flex items-center gap-2 mb-4 bg-white p-2 rounded-xl border border-gray-100 shadow-sm focus-within:ring-2 focus-within:ring-primary/20">
+                    <button type="submit" className="text-primary hover:bg-primary/10 p-1 rounded-full transition-colors">
                         <Plus size={20} />
                     </button>
-                </div>
+                    <input
+                        type="text"
+                        value={newTask}
+                        onChange={(e) => setNewTask(e.target.value)}
+                        placeholder="Nueva tarea..."
+                        className="flex-1 bg-transparent border-none outline-none text-sm placeholder-text-muted"
+                    />
+                </form>
 
                 <div className="space-y-2">
                     {tasks.map((task) => (
-                        <div key={task.id} className="flex items-center gap-3 group">
+                        <div key={task.id} className="flex items-start gap-3 group">
                             <button
-                                onClick={() => toggleTask(task.id)}
+                                onClick={() => toggleTask(task.id, task.is_completed)}
                                 className={clsx(
-                                    "shrink-0 w-5 h-5 rounded border transition-colors flex items-center justify-center",
-                                    task.completed ? "bg-secondary border-secondary text-white" : "border-text-muted/40 text-transparent hover:border-secondary"
+                                    "mt-1 w-5 h-5 rounded border flex items-center justify-center transition-colors cursor-pointer",
+                                    task.is_completed ? "bg-primary border-primary text-white" : "border-gray-300 hover:border-primary"
                                 )}
                             >
-                                <Check size={14} strokeWidth={3} />
+                                {task.is_completed && <CheckSquare size={14} />}
                             </button>
-                            <span className={clsx(
-                                "flex-1 text-sm transition-all decoration-secondary/50",
-                                task.completed ? "text-text-muted line-through" : "text-text-main"
-                            )}>
-                                {task.text}
-                            </span>
-                            <button
-                                onClick={() => setTasks(tasks.filter(t => t.id !== task.id))}
-                                className="opacity-0 group-hover:opacity-100 text-red-300 hover:text-red-500 transition-opacity"
-                            >
-                                <Trash2 size={16} />
-                            </button>
+                            <div className="flex-1 border-b border-gray-50 pb-2 flex justify-between">
+                                <span className={clsx(
+                                    "text-sm transition-all text-text-main",
+                                    task.is_completed && "line-through text-text-muted decoration-text-muted/50"
+                                )}>
+                                    {task.title}
+                                </span>
+                                <button
+                                    onClick={() => deleteTask(task.id)}
+                                    className="text-text-muted opacity-0 group-hover:opacity-100 hover:text-red-400 text-xs transition-opacity px-2"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                            </div>
                         </div>
                     ))}
 
-                    {isAddingTask && (
-                        <div className="flex items-center gap-3 animate-fade-in">
-                            <div className="w-5 h-5 rounded border border-dashed border-text-muted/40 shrink-0" />
-                            <input
-                                autoFocus
-                                type="text"
-                                value={newTaskText}
-                                onChange={(e) => setNewTaskText(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && addTask()}
-                                onBlur={() => !newTaskText && setIsAddingTask(false)}
-                                placeholder="Nueva tarea..."
-                                className="flex-1 bg-transparent text-sm focus:outline-none placeholder-text-muted/50"
-                            />
-                        </div>
+                    {tasks.length === 0 && (
+                        <p className="text-center text-xs text-text-muted/50 py-4 italic">
+                            No hay tareas para hoy.
+                        </p>
                     )}
                 </div>
             </section>
-
-            {/* Bottom spacer handled by Layout, but extra safety */}
-            <div className="h-4" />
         </div>
     );
 }

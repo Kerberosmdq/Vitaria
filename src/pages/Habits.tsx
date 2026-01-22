@@ -1,30 +1,34 @@
 import { useState } from 'react';
 import { format, subDays, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Meh, Heart, Sun, Cloud, CloudRain } from 'lucide-react';
+import { Meh, Heart, Sun, Cloud, CloudRain, Plus, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { clsx } from 'clsx';
-
-interface Habit {
-    id: string;
-    name: string;
-    completedDates: string[]; // ISO date strings
-}
+import { useHabits } from '@/hooks/useHabits'; // Hook import
 
 export default function Habits() {
     const today = new Date();
-
     // Weekly Streak Setup
-    const last7Days = Array.from({ length: 7 }, (_, i) => subDays(today, 6 - i));
+    // Weekly Streak Setup
+    // last7Days defined below after hook call
 
-    const [habits, setHabits] = useState<Habit[]>([
-        { id: '1', name: 'Leer 15 min', completedDates: [today.toISOString()] },
-        { id: '2', name: 'Skincare', completedDates: [] },
-        { id: '3', name: 'Beber agua', completedDates: [] },
-        { id: '4', name: 'Yoga', completedDates: [] },
-    ]);
+    const {
+        habits,
+        logs,
+        mood,
+        gratitude,
+        selectedDate,
+        changeWeek,
+        toggleHabit,
+        updateMood,
+        updateGratitude,
+        addHabit
+    } = useHabits();
 
-    const [mood, setMood] = useState<number | null>(null);
-    const [gratitude, setGratitude] = useState('');
+    const last7Days = Array.from({ length: 7 }, (_, i) => subDays(selectedDate, 6 - i));
+    const isCurrentWeek = isSameDay(selectedDate, today);
+
+    const [isAdding, setIsAdding] = useState(false);
+    const [newHabitName, setNewHabitName] = useState('');
 
     const [selfCareItems, setSelfCareItems] = useState([
         { id: '1', label: 'Mascarilla', done: false },
@@ -32,25 +36,16 @@ export default function Habits() {
         { id: '3', label: 'Desconexión digital', done: false },
         { id: '4', label: 'Té relajante', done: false },
         { id: '5', label: 'Estiramientos', done: false },
+        { id: '6', label: 'Llamar a una amiga', done: false },
     ]);
 
-    const toggleHabit = (habitId: string, date: Date) => {
-        // Only allow toggling for today for simplicity in this mock
-        if (!isSameDay(date, today)) return;
-
-        setHabits(habits.map(h => {
-            if (h.id !== habitId) return h;
-
-            const dateStr = date.toISOString();
-            const isCompleted = h.completedDates.some(d => isSameDay(new Date(d), date));
-
-            return {
-                ...h,
-                completedDates: isCompleted
-                    ? h.completedDates.filter(d => !isSameDay(new Date(d), date))
-                    : [...h.completedDates, dateStr]
-            };
-        }));
+    const handleAddHabit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (newHabitName.trim()) {
+            addHabit(newHabitName);
+            setNewHabitName('');
+            setIsAdding(false);
+        }
     };
 
     const toggleSelfCare = (id: string) => {
@@ -60,7 +55,7 @@ export default function Habits() {
     };
 
     return (
-        <div className="px-4 pb-4 max-w-md mx-auto space-y-8 animate-fade-in">
+        <div className="px-4 pb-24 max-w-md mx-auto space-y-8 animate-fade-in">
 
             {/* Header */}
             <header className="pt-6 pb-2">
@@ -72,10 +67,53 @@ export default function Habits() {
 
             {/* Weekly Streak View */}
             <section className="bg-surface p-5 rounded-2xl shadow-sm">
-                <h3 className="font-serif text-lg font-medium text-text-main mb-4">
-                    Racha Semanal
-                </h3>
-                <div className="overflow-x-auto">
+                <div className="flex justify-between items-center mb-4">
+                    <div className="flex items-center gap-2">
+                        <h3 className="font-serif text-lg font-medium text-text-main">
+                            Racha
+                        </h3>
+                        <div className="flex items-center gap-1 bg-stone-100 rounded-lg px-1 py-0.5">
+                            <button onClick={() => changeWeek(-1)} className="p-1 hover:bg-stone-200 rounded-md text-text-muted">
+                                <ChevronLeft size={14} />
+                            </button>
+                            <span className="text-[10px] text-text-muted uppercase w-20 text-center font-medium">
+                                {format(subDays(selectedDate, 6), 'd MMM', { locale: es })} - {format(selectedDate, 'd MMM', { locale: es })}
+                            </span>
+                            <button
+                                onClick={() => changeWeek(1)}
+                                disabled={isCurrentWeek}
+                                className={clsx("p-1 rounded-md transition-colors", isCurrentWeek ? "text-stone-300" : "hover:bg-stone-200 text-text-muted")}
+                            >
+                                <ChevronRight size={14} />
+                            </button>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => setIsAdding(!isAdding)}
+                        className="text-primary hover:bg-stone-100 p-1 rounded-full transition-colors"
+                    >
+                        <Plus size={20} />
+                    </button>
+                </div>
+
+                {/* Add Habit Form */}
+                {isAdding && (
+                    <form onSubmit={handleAddHabit} className="mb-4 flex gap-2 animate-fade-in">
+                        <input
+                            autoFocus
+                            type="text"
+                            value={newHabitName}
+                            onChange={(e) => setNewHabitName(e.target.value)}
+                            placeholder="Nuevo hábito..."
+                            className="flex-1 bg-gray-50 border-none rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-primary/50"
+                        />
+                        <button type="submit" className="bg-primary text-white text-xs px-3 rounded-lg font-medium">
+                            Crear
+                        </button>
+                    </form>
+                )}
+
+                <div className="overflow-x-auto no-scrollbar">
                     <table className="w-full min-w-[300px]">
                         <thead>
                             <tr>
@@ -100,34 +138,41 @@ export default function Habits() {
                         <tbody>
                             {habits.map((habit) => (
                                 <tr key={habit.id} className="group">
-                                    <td className="py-3 text-sm font-medium text-text-main pr-2">
+                                    <td className="py-3 text-sm font-medium text-text-main pr-2 whitespace-normal break-words max-w-[120px]">
                                         {habit.name}
                                     </td>
                                     {last7Days.map((date) => {
-                                        const isCompleted = habit.completedDates.some(d => isSameDay(new Date(d), date));
-                                        const isToday = isSameDay(date, today);
+                                        const dateStr = format(date, 'yyyy-MM-dd');
+                                        const isCompleted = logs.some(l => l.habit_id === habit.id && l.date === dateStr && l.status === 'completed');
+                                        const isFuture = date > today;
 
                                         return (
                                             <td key={date.toString()} className="text-center py-2">
                                                 <button
-                                                    disabled={!isToday}
+                                                    disabled={isFuture}
                                                     onClick={() => toggleHabit(habit.id, date)}
                                                     className={clsx(
                                                         "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300",
                                                         isCompleted
                                                             ? "bg-secondary text-white scale-100 shadow-sm"
-                                                            : "border border-gray-100 text-transparent",
-                                                        isToday && !isCompleted && "border-secondary/30 hover:bg-secondary/10 cursor-pointer",
-                                                        !isToday && !isCompleted && "bg-gray-50 opacity-50"
+                                                            : "border border-gray-100 text-transparent hover:border-secondary/30",
+                                                        isFuture && "opacity-20 cursor-not-allowed hover:border-transparent"
                                                     )}
                                                 >
-                                                    {isCompleted && <CheckIcon size={14} strokeWidth={4} />}
+                                                    {isCompleted && <Check size={14} strokeWidth={4} />}
                                                 </button>
                                             </td>
                                         );
                                     })}
                                 </tr>
                             ))}
+                            {habits.length === 0 && !isAdding && (
+                                <tr>
+                                    <td colSpan={8} className="text-center py-8 text-xs text-text-muted italic">
+                                        No tienes hábitos aún. ¡Crea el primero!
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>
@@ -143,12 +188,12 @@ export default function Habits() {
                         { val: 1, icon: CloudRain, label: 'Mal' },
                         { val: 2, icon: Cloud, label: 'Regular' },
                         { val: 3, icon: Meh, label: 'Normal' },
-                        { val: 4, icon: Sun, label: 'Bien' }, // Using Sun as happy
-                        { val: 5, icon: Heart, label: 'Genial' } // Heart as Very Good
+                        { val: 4, icon: Sun, label: 'Bien' },
+                        { val: 5, icon: Heart, label: 'Genial' }
                     ].map((m) => (
                         <button
                             key={m.val}
-                            onClick={() => setMood(m.val)}
+                            onClick={() => updateMood(m.val)}
                             className={clsx(
                                 "flex flex-col items-center gap-2 transition-all duration-300 transform",
                                 mood === m.val ? "scale-125 text-primary" : "text-text-muted hover:text-primary/60 scale-100"
@@ -173,7 +218,7 @@ export default function Habits() {
                 </h3>
                 <textarea
                     value={gratitude}
-                    onChange={(e) => setGratitude(e.target.value)}
+                    onChange={(e) => updateGratitude(e.target.value)}
                     placeholder="Escribe algo positivo..."
                     className="w-full bg-transparent border-none resize-none focus:ring-0 text-text-main leading-relaxed placeholder-text-muted/50 h-24 text-base font-handwriting"
                     style={{ backgroundImage: 'linear-gradient(transparent 1.9rem, #E5E7EB 1.95rem)', backgroundSize: '100% 2rem', lineHeight: '2rem' }}
@@ -206,11 +251,5 @@ export default function Habits() {
             {/* Spacer */}
             <div className="h-4" />
         </div>
-    );
-}
-
-function CheckIcon({ size, strokeWidth }: { size?: number, strokeWidth?: number }) {
-    return (
-        <svg xmlns="http://www.w3.org/2000/svg" width={size || 24} height={size || 24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth || 2} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
     );
 }

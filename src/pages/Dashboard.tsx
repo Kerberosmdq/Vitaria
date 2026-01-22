@@ -1,11 +1,37 @@
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useState } from 'react';
-import { Check, Star, Smile, Meh, Frown } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Check, Star, Smile, Meh, Frown, Pencil } from 'lucide-react';
 import { clsx } from 'clsx';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 export default function Dashboard() {
+    const { user } = useAuth();
     const today = new Date();
+
+    const [isEditing, setIsEditing] = useState(false);
+    const [displayName, setDisplayName] = useState('Miga');
+
+    useEffect(() => {
+        if (user?.user_metadata?.full_name) {
+            setDisplayName(user.user_metadata.full_name);
+        }
+    }, [user]);
+
+    const handleUpdateName = async () => {
+        if (!displayName.trim()) return;
+
+        try {
+            const { error } = await supabase.auth.updateUser({
+                data: { full_name: displayName }
+            });
+            if (error) throw error;
+            setIsEditing(false);
+        } catch (error) {
+            console.error('Error updating name:', error);
+        }
+    };
 
     // Mock Data
     const [habits, setHabits] = useState([
@@ -31,9 +57,39 @@ export default function Dashboard() {
                 <h2 className="text-text-muted text-sm font-medium uppercase tracking-wider">
                     {format(today, "EEEE, d 'de' MMMM", { locale: es })}
                 </h2>
-                <h1 className="text-3xl font-serif text-text-main">
-                    Hola, Miga
-                </h1>
+                <div className="flex items-center gap-2 group">
+                    {isEditing ? (
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-3xl font-serif text-text-main flex items-center">
+                                Hola,
+                                <input
+                                    autoFocus
+                                    type="text"
+                                    value={displayName}
+                                    onChange={(e) => setDisplayName(e.target.value)}
+                                    onBlur={handleUpdateName}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleUpdateName()}
+                                    className="ml-2 bg-transparent border-b border-primary outline-none w-32 font-serif text-text-main placeholder-text-muted/50"
+                                />
+                            </h1>
+                            <button onClick={handleUpdateName} className="p-1 text-primary hover:bg-stone-100 rounded-full">
+                                <Check size={20} />
+                            </button>
+                        </div>
+                    ) : (
+                        <>
+                            <h1 className="text-3xl font-serif text-text-main">
+                                Hola, {displayName}
+                            </h1>
+                            <button
+                                onClick={() => setIsEditing(true)}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-text-muted hover:text-primary hover:bg-stone-100 rounded-lg"
+                            >
+                                <Pencil size={16} />
+                            </button>
+                        </>
+                    )}
+                </div>
             </header>
 
             {/* Daily Focus Widget */}

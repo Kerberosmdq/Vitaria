@@ -1,186 +1,231 @@
-import { ArrowUp, ArrowDown, ShoppingCart, Home, Coffee, Plus, HelpCircle } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowUp, ArrowDown, Plus, ShoppingCart, Home, Coffee, Wallet, Trash2, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
 import { clsx } from 'clsx';
+import { useFinance } from '@/hooks/useFinance';
+import AddTransactionModal from '@/components/finance/AddTransactionModal';
+import BudgetSettingsModal from '@/components/finance/BudgetSettingsModal';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-interface Transaction {
-    id: string;
-    name: string;
-    category: string;
-    amount: number;
-    type: 'income' | 'expense';
-    date: Date;
-}
-
 export default function Finance() {
-    // Mock Data
-    const income = 2850.00;
-    const expenses = 1240.50;
-    const balance = income - expenses;
+    const {
+        transactions,
+        stats,
+        loading,
+        selectedDate,
+        changeMonth,
+        budgetSettings,
+        updateBudgetSettings,
+        addTransaction,
+        deleteTransaction
+    } = useFinance();
 
-    // Budget Data (50/30/20)
-    const budget = {
-        needs: { limit: 1500, spent: 850 }, // 50%
-        wants: { limit: 900, spent: 390 },  // 30%
-        savings: { limit: 600, saved: 400 }, // 20%
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+
+    // Calculate percentages safely (avoid /0)
+    const getPercent = (value: number) => {
+        if (stats.totalIncome === 0) return 0;
+        return Math.min(100, (value / stats.totalIncome) * 100);
     };
 
-    const transactions: Transaction[] = [
-        { id: '1', name: 'Supermercado', category: 'necesidad', amount: 125.50, type: 'expense', date: new Date() },
-        { id: '2', name: 'Alquiler', category: 'necesidad', amount: 600.00, type: 'expense', date: new Date() },
-        { id: '3', name: 'Freelance Design', category: 'income', amount: 850.00, type: 'income', date: new Date() },
-        { id: '4', name: 'Café & Brunch', category: 'deseo', amount: 45.00, type: 'expense', date: new Date() },
-    ];
+    const needsPercent = getPercent(stats.totalNeeds);
+    const wantsPercent = getPercent(stats.totalWants);
+    const savingsPercent = getPercent(stats.totalSavings);
 
     return (
-        <div className="px-4 pb-24 max-w-md mx-auto space-y-6 animate-fade-in relative">
+        <div className="px-4 pb-24 max-w-md mx-auto space-y-6 animate-fade-in relative min-h-screen">
 
-            {/* Header */}
-            <header className="pt-6 pb-2">
-                <h1 className="text-3xl font-serif text-text-main">
-                    Finanzas
-                </h1>
-                <p className="text-text-muted text-sm">Control consciente, sin estrés.</p>
+            <header className="pt-6 flex justify-between items-start">
+                <div>
+                    <h1 className="text-3xl font-serif text-text-main leading-tight mb-1">Finanzas</h1>
+                    <div className="flex items-center gap-2 bg-white/50 rounded-full px-2 py-1 -ml-2">
+                        <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-stone-200 rounded-full text-text-muted">
+                            <ChevronLeft size={16} />
+                        </button>
+                        <span className="text-sm font-medium text-text-main capitalize w-24 text-center">
+                            {format(selectedDate, 'MMMM yyyy', { locale: es })}
+                        </span>
+                        <button onClick={() => changeMonth(1)} className="p-1 hover:bg-stone-200 rounded-full text-text-muted">
+                            <ChevronRight size={16} />
+                        </button>
+                    </div>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                    <button
+                        onClick={() => setIsSettingsModalOpen(true)}
+                        className="p-2 text-text-muted hover:bg-stone-100 rounded-full transition-colors"
+                    >
+                        <Settings size={20} />
+                    </button>
+                    {loading && <span className="text-primary text-[10px] animate-pulse">Cargando...</span>}
+                </div>
             </header>
 
-            {/* Balance Card */}
-            <section className="bg-surface p-6 rounded-2xl shadow-sm border border-primary/5">
-                <div className="text-center mb-6">
-                    <p className="text-sm text-text-muted uppercase tracking-wider mb-1">Saldo del Mes</p>
-                    <h2 className="text-4xl font-sans font-semibold text-text-main tracking-tight">
-                        $ {balance.toFixed(2)}
-                    </h2>
-                </div>
+            {/* Main Balance Card */}
+            <div className="bg-text-main text-paper rounded-3xl p-6 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
 
-                <div className="flex justify-between items-center px-4">
-                    <div className="flex flex-col items-center gap-1">
-                        <div className="flex items-center gap-1 text-secondary font-medium bg-secondary/10 px-2 py-1 rounded-full text-xs">
-                            <ArrowUp size={14} />
-                            <span>Ingresos</span>
+                <div className="relative z-10">
+                    <p className="text-white/60 text-sm mb-1">Saldo Disponible</p>
+                    <h2 className="text-4xl font-serif mb-6 text-white">${stats.balance.toLocaleString()}</h2>
+
+                    <div className="flex gap-6">
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-green-300">
+                                <ArrowUp size={16} />
+                            </div>
+                            <div>
+                                <p className="text-[10px] text-white/50 uppercase tracking-wider">Ingresos</p>
+                                <p className="font-medium text-white">${stats.totalIncome.toLocaleString()}</p>
+                            </div>
                         </div>
-                        <span className="font-medium text-lg text-text-main">
-                            $ {income.toFixed(0)}
-                        </span>
-                    </div>
-                    <div className="w-[1px] h-10 bg-gray-100"></div>
-                    <div className="flex flex-col items-center gap-1">
-                        <div className="flex items-center gap-1 text-red-500 font-medium bg-red-50 px-2 py-1 rounded-full text-xs">
-                            <ArrowDown size={14} />
-                            <span>Gastos</span>
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-red-300">
+                                <ArrowDown size={16} />
+                            </div>
+                            <div>
+                                <p className="text-[10px] text-white/50 uppercase tracking-wider">Gastos</p>
+                                <p className="font-medium text-white">${stats.totalExpenses.toLocaleString()}</p>
+                            </div>
                         </div>
-                        <span className="font-medium text-lg text-text-main">
-                            $ {expenses.toFixed(0)}
-                        </span>
                     </div>
                 </div>
-            </section>
+            </div>
 
-            {/* 50/30/20 Budget Tracker */}
-            <section>
-                <div className="flex items-center gap-2 mb-4">
-                    <h3 className="font-serif text-lg font-medium text-text-main">
-                        Mi Presupuesto (50/30/20)
+            {/* Dynamic Budget */}
+            <section className="bg-surface p-5 rounded-2xl shadow-sm border border-stone-50">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-serif text-lg text-text-main">
+                        Presupuesto ({budgetSettings.needs}/{budgetSettings.wants}/{budgetSettings.savings})
                     </h3>
-                    <button className="text-text-muted opacity-50 hover:opacity-100">
-                        <HelpCircle size={16} />
-                    </button>
+                    {stats.totalIncome === 0 && <span className="text-[10px] text-orange-400 bg-orange-50 px-2 py-1 rounded-full">Sin Ingresos</span>}
                 </div>
 
-                <div className="space-y-4 bg-surface p-5 rounded-2xl shadow-sm">
+                <div className="space-y-4">
                     {/* Needs */}
-                    <BudgetBar
-                        label="Necesidades (50%)"
-                        current={budget.needs.spent}
-                        max={budget.needs.limit}
-                        colorClass="bg-blue-400/80"
-                    />
+                    <div>
+                        <div className="flex justify-between text-xs mb-1">
+                            <span className="font-medium text-text-main">Necesidades ({budgetSettings.needs}%)</span>
+                            <span className="text-text-muted">${stats.totalNeeds.toLocaleString()} ({Math.round(needsPercent)}%)</span>
+                        </div>
+                        <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-blue-400/80 rounded-full transition-all duration-1000 ease-out"
+                                style={{ width: `${needsPercent}%` }}
+                            />
+                        </div>
+                    </div>
+
                     {/* Wants */}
-                    <BudgetBar
-                        label="Deseos (30%)"
-                        current={budget.wants.spent}
-                        max={budget.wants.limit}
-                        colorClass="bg-primary"
-                    />
+                    <div>
+                        <div className="flex justify-between text-xs mb-1">
+                            <span className="font-medium text-text-main">Deseos ({budgetSettings.wants}%)</span>
+                            <span className="text-text-muted">${stats.totalWants.toLocaleString()} ({Math.round(wantsPercent)}%)</span>
+                        </div>
+                        <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-primary/80 rounded-full transition-all duration-1000 ease-out"
+                                style={{ width: `${wantsPercent}%` }}
+                            />
+                        </div>
+                    </div>
+
                     {/* Savings */}
-                    <BudgetBar
-                        label="Ahorros (20%)"
-                        current={budget.savings.saved}
-                        max={budget.savings.limit}
-                        colorClass="bg-secondary"
-                    />
+                    <div>
+                        <div className="flex justify-between text-xs mb-1">
+                            <span className="font-medium text-text-main">Ahorro ({budgetSettings.savings}%)</span>
+                            <span className="text-text-muted">${stats.totalSavings.toLocaleString()} ({Math.round(savingsPercent)}%)</span>
+                        </div>
+                        <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-secondary/80 rounded-full transition-all duration-1000 ease-out"
+                                style={{ width: `${savingsPercent}%` }}
+                            />
+                        </div>
+                    </div>
                 </div>
             </section>
 
             {/* Recent Transactions */}
             <section>
-                <h3 className="font-serif text-lg font-medium text-text-main mb-4 px-1">
-                    Últimos Movimientos
-                </h3>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-serif text-lg text-text-main">Movimientos</h3>
+                    <span className="text-xs text-text-muted capitalize">
+                        {format(selectedDate, 'MMM yyyy', { locale: es })}
+                    </span>
+                </div>
+
                 <div className="space-y-3">
-                    {transactions.map((t) => (
-                        <div key={t.id} className="bg-surface p-4 rounded-xl shadow-sm flex items-center justify-between border border-transparent hover:border-primary/5 transition-colors">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-paper flex items-center justify-center text-text-muted">
-                                    <CategoryIcon category={t.category} />
+                    {transactions.map((tx) => (
+                        <div key={tx.id} className="bg-surface p-4 rounded-2xl flex items-center justify-between shadow-sm border border-stone-50 group">
+                            <div className="flex items-center gap-4">
+                                <div className={clsx(
+                                    "w-10 h-10 rounded-full flex items-center justify-center",
+                                    tx.type === 'income' ? "bg-green-50 text-green-600" : "bg-stone-50 text-text-muted"
+                                )}>
+                                    {tx.type === 'income' ? <Wallet size={18} /> :
+                                        tx.category === 'needs' ? <Home size={18} /> :
+                                            tx.category === 'wants' ? <ShoppingBagIcon category={tx.category} /> : <Coffee size={18} />}
                                 </div>
                                 <div>
-                                    <p className="font-medium text-text-main text-sm">{t.name}</p>
-                                    <p className="text-xs text-text-muted first-letter:uppercase">
-                                        {format(t.date, "d MMM", { locale: es })}
+                                    <p className="font-medium text-text-main text-sm">{tx.description}</p>
+                                    <p className="text-xs text-text-muted capitalize">
+                                        {format(new Date(tx.date), "d MMM", { locale: es })} • {tx.category === 'general' ? 'Ingreso' : tx.category}
                                     </p>
                                 </div>
                             </div>
-                            <span className={clsx(
-                                "font-mono font-medium",
-                                t.type === 'income' ? "text-secondary" : "text-red-400"
-                            )}>
-                                {t.type === 'income' ? '+' : '-'} ${t.amount.toFixed(2)}
-                            </span>
+                            <div className="flex items-center gap-3">
+                                <span className={clsx(
+                                    "font-mono font-medium text-sm",
+                                    tx.type === 'income' ? "text-green-600" : "text-text-main"
+                                )}>
+                                    {tx.type === 'income' ? '+' : '-'}${tx.amount.toLocaleString()}
+                                </span>
+                                <button
+                                    onClick={() => deleteTransaction(tx.id)}
+                                    className="opacity-0 group-hover:opacity-100 text-stone-300 hover:text-red-400 transition-all p-1"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                            </div>
                         </div>
                     ))}
+
+                    {transactions.length === 0 && (
+                        <div className="text-center py-8 text-text-muted/50 text-xs italic">
+                            No hay movimientos en {format(selectedDate, 'MMMM', { locale: es })}.
+                        </div>
+                    )}
                 </div>
             </section>
 
             {/* FAB */}
-            <button className="fixed bottom-24 right-5 w-14 h-14 bg-text-main text-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-300 z-50">
-                <Plus size={28} />
+            <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="fixed bottom-24 right-4 w-14 h-14 bg-text-main text-white rounded-full shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-all z-20"
+            >
+                <Plus size={24} />
             </button>
 
+            <AddTransactionModal
+                isOpen={isAddModalOpen}
+                onClose={() => setIsAddModalOpen(false)}
+                onSave={addTransaction}
+            />
+
+            <BudgetSettingsModal
+                isOpen={isSettingsModalOpen}
+                onClose={() => setIsSettingsModalOpen(false)}
+                currentSettings={budgetSettings}
+                onSave={updateBudgetSettings}
+            />
         </div>
     );
 }
 
-function BudgetBar({ label, current, max, colorClass }: { label: string, current: number, max: number, colorClass: string }) {
-    const percentage = Math.min((current / max) * 100, 100);
-
-    return (
-        <div className="space-y-1">
-            <div className="flex justify-between text-xs mb-1">
-                <span className="font-medium text-text-muted">{label}</span>
-                <span className="text-text-main font-semibold">
-                    ${current} <span className="text-text-muted font-normal">/ ${max}</span>
-                </span>
-            </div>
-            <div className="h-2.5 w-full bg-paper rounded-full overflow-hidden">
-                <div
-                    className={clsx("h-full rounded-full transition-all duration-1000", colorClass)}
-                    style={{ width: `${percentage}%` }}
-                />
-            </div>
-        </div>
-    )
-}
-
-function CategoryIcon({ category }: { category: string }) {
-    if (category.includes('necesidad') || category.includes('alquiler') || category.includes('casa')) return <Home size={18} />;
-    if (category.includes('super')) return <ShoppingCart size={18} />;
-    if (category.includes('deseo') || category.includes('café')) return <Coffee size={18} />;
-    return <ShoppingBag size={18} />;
-}
-
-// Fallback icon
-function ShoppingBag({ size }: { size: number }) {
-    return (
-        <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" /><path d="M3 6h18" /><path d="M16 10a4 4 0 0 1-8 0" /></svg>
-    )
+// Helper icon
+function ShoppingBagIcon({ category }: { category: string }) {
+    if (category === 'wants') return <ShoppingCart size={18} />;
+    return <Wallet size={18} />;
 }
