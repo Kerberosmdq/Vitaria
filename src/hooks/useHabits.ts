@@ -159,7 +159,7 @@ export function useHabits() {
     const addHabit = async (name: string) => {
         // Optimistic? No need, fast enough usually, or we can just append.
         try {
-            const { data, error } = await supabase
+            const { data } = await supabase
                 .from('habits')
                 .insert({ user_id: user!.id, name })
                 .select()
