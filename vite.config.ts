@@ -8,7 +8,7 @@ export default defineConfig({
         react(),
         VitePWA({
             registerType: 'autoUpdate',
-            includeAssets: ['favicon.ico', 'icon.svg'],
+            includeAssets: ['favicon.ico', 'icon.svg', 'logo.png'],
             manifest: {
                 name: 'Vitaria - Tu Año Ideal',
                 short_name: 'Vitaria',
@@ -19,14 +19,20 @@ export default defineConfig({
                 orientation: 'portrait',
                 icons: [
                     {
-                        src: 'icon.svg',
+                        src: 'logo.png',
                         sizes: '192x192',
-                        type: 'image/svg+xml'
+                        type: 'image/png'
                     },
                     {
-                        src: 'icon.svg',
+                        src: 'logo.png',
                         sizes: '512x512',
-                        type: 'image/svg+xml'
+                        type: 'image/png'
+                    },
+                    {
+                        src: 'logo.png',
+                        sizes: '512x512',
+                        type: 'image/png',
+                        purpose: 'maskable'
                     }
                 ]
             }
